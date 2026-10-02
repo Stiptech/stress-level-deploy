@@ -14,11 +14,12 @@ SEV_COLOR = {"SEVERE": "#dc2626", "MODERATE": "#ca8a04", "LIGHT": "#2563eb", "NO
 st.markdown(
     """
     <style>
-    .block-container {max-width: 860px; padding-top: 1.5rem;}
+    .block-container {max-width: 860px; padding-top: 5rem;}
     .brand {display:flex; align-items:center; gap:12px; font-size:1.25rem; font-weight:600;}
     .logo {width:40px; height:40px; border-radius:10px; display:flex; align-items:center;
            justify-content:center; background:linear-gradient(135deg,#3b82f6,#9333ea);}
     .card {background:#fff; border:1px solid #e5e7eb; border-radius:14px; padding:20px; text-align:center;}
+    .feat {min-height:230px;}
     .card h4 {margin:0 0 4px 0;}
     .score {font-size:2rem; font-weight:600;}
     .pill {display:inline-block; padding:4px 14px; border-radius:999px; background:#f3e8ff;
@@ -98,7 +99,7 @@ def page_landing():
     ]
     for col, (tag, title, body) in zip(cols, items):
         col.markdown(
-            f'<div class="card"><span class="pill">{tag}</span><h4 style="margin-top:12px">{title}</h4>'
+            f'<div class="card feat"><span class="pill">{tag}</span><h4 style="margin-top:12px">{title}</h4>'
             f'<p style="color:#6b7280;font-size:.9rem">{body}</p></div>',
             unsafe_allow_html=True,
         )
