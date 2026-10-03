@@ -2,11 +2,9 @@ import datetime as dt
 
 import streamlit as st
 
-import db
 import scoring as sc
 
 st.set_page_config(page_title="Stress Level Assessment", page_icon="🧠", layout="centered")
-db.init_db()
 
 GENDERS = {"male": "Laki-laki", "female": "Perempuan", "other": "Lainnya"}
 SEV_COLOR = {"SEVERE": "#dc2626", "MODERATE": "#ca8a04", "LIGHT": "#2563eb", "NONE": "#16a34a"}
@@ -33,48 +31,37 @@ st.markdown(
 # ---------------------------------------------------------------- state
 ss = st.session_state
 ss.setdefault("page", "landing")
-ss.setdefault("user", None)
+ss.setdefault("user", None)  # data diri opsional, hanya hidup selama sesi
 ss.setdefault("answers", [None] * sc.TOTAL)
 ss.setdefault("q", 0)
-ss.setdefault("result_saved", False)
-ss.setdefault("auth_mode", "login")
 
 
 def go(page: str):
     ss.page = page
 
 
-def logout():
-    ss.user = None
-    ss.page = "landing"
-
-
 def start_test():
     ss.answers = [None] * sc.TOTAL
     ss.q = 0
-    ss.result_saved = False
     ss.page = "questions"
 
 
 # ---------------------------------------------------------------- header
-def header(show_user: bool = True):
+def header():
     c1, c2 = st.columns([3, 2], vertical_alignment="center")
     c1.markdown('<div class="brand"><div class="logo">🧠</div>Stress Level Assessment</div>',
                 unsafe_allow_html=True)
-    if not show_user:
-        return
     with c2:
         u = ss.user
         if u:
-            a, b, c = st.columns([1, 3, 3], vertical_alignment="center")
+            a, b = st.columns([1, 4], vertical_alignment="center")
             if u.get("photo"):
                 a.image(u["photo"], width=38)
-            b.button(u["name"].split()[0] if u["name"] else "Profil", key="hdr_prof",
-                     on_click=go, args=("profile",), use_container_width=True)
-            c.button("Keluar", key="hdr_out", on_click=logout, use_container_width=True)
+            b.button(u["name"].split()[0], key="hdr_prof", on_click=go, args=("profile",),
+                     use_container_width=True)
         else:
-            st.button("Masuk", key="hdr_login", type="primary",
-                      on_click=go, args=("auth",), use_container_width=True)
+            st.button("Data Diri", key="hdr_prof", on_click=go, args=("profile",),
+                      use_container_width=True)
     st.divider()
 
 
@@ -107,101 +94,43 @@ def page_landing():
     _, mid, _ = st.columns([1, 2, 1])
     mid.button("Mulai Tes Sekarang", type="primary", use_container_width=True, on_click=start_test)
     if not ss.user:
-        mid.caption("Kamu bisa mulai tanpa login. Login kalau mau hasilnya tersimpan.")
-        mid.button("Login untuk menyimpan hasil", type="tertiary", on_click=go, args=("auth",))
-
-
-# ---------------------------------------------------------------- auth
-def page_auth():
-    header(show_user=False)
-    st.button("← Kembali", on_click=go, args=("landing",), type="tertiary")
-    login_mode = ss.auth_mode == "login"
-    st.subheader("Masuk ke akun Anda" if login_mode else "Buat akun baru")
-
-    with st.form("auth_form"):
-        name = "" if login_mode else st.text_input("Nama Lengkap", placeholder="Masukkan nama lengkap")
-        email = st.text_input("Email", placeholder="email@example.com")
-        pw = st.text_input("Password", type="password")
-        ok = st.form_submit_button("Masuk" if login_mode else "Daftar", type="primary",
-                                   use_container_width=True)
-
-    if ok:
-        if not email or not pw:
-            st.error("Email dan password harus diisi")
-        elif not login_mode and not name.strip():
-            st.error("Nama harus diisi")
-        elif login_mode:
-            user = db.login(email, pw)
-            if user:
-                ss.user, ss.page = user, "landing"
-                st.rerun()
-            else:
-                st.error("Email atau password salah")
-        else:
-            if len(pw) < 6:
-                st.error("Password minimal 6 karakter")
-            else:
-                user, err = db.register(email, pw, name)
-                if err:
-                    st.error(err)
-                else:
-                    ss.user, ss.page = user, "profile"  # lengkapi profil dulu
-                    st.rerun()
-
-    def toggle():
-        ss.auth_mode = "register" if login_mode else "login"
-
-    st.button("Belum punya akun? Daftar" if login_mode else "Sudah punya akun? Masuk",
-              on_click=toggle, type="tertiary")
+        mid.caption("Data diri bersifat opsional. Kamu bisa langsung mulai tes.")
 
 
 # ---------------------------------------------------------------- profile
 def page_profile():
-    if not ss.user:
-        ss.page = "auth"
-        st.rerun()
     header()
-    u = ss.user
-    st.subheader("Profil Saya")
-    st.caption("Lengkapi profil Anda untuk melanjutkan")
+    u = ss.user or {}
+    st.subheader("Data Diri")
+    st.caption("Opsional. Hanya dipakai untuk mengisi file hasil tes dan hilang saat halaman ditutup.")
 
     with st.form("profile_form"):
-        photo = st.file_uploader("Foto profil", type=["png", "jpg", "jpeg", "webp"])
+        photo = st.file_uploader("Foto profil (opsional)", type=["png", "jpg", "jpeg", "webp"])
         if u.get("photo") and not photo:
             st.image(u["photo"], width=96)
-        name = st.text_input("Nama Lengkap *", value=u.get("name") or "")
-        sid = st.text_input("NIM *", value=u.get("student_id") or "")
+        name = st.text_input("Nama Lengkap *", value=u.get("name", ""))
+        sid = st.text_input("NIM *", value=u.get("student_id", ""))
         c1, c2 = st.columns(2)
-        age = c1.number_input("Usia *", min_value=0, max_value=120, value=int(u.get("age") or 0))
+        age = c1.number_input("Usia *", min_value=0, max_value=120, value=int(u.get("age", 0)))
         keys = list(GENDERS)
         gender = c2.selectbox("Gender *", keys, format_func=GENDERS.get,
-                              index=keys.index(u.get("gender") or "male"))
-        uni = st.text_input("Universitas *", value=u.get("university") or "")
-        dept = st.text_input("Program Studi *", value=u.get("department") or "")
-        saved = st.form_submit_button("Simpan Profil", type="primary", use_container_width=True)
+                              index=keys.index(u.get("gender", "male")))
+        uni = st.text_input("Universitas *", value=u.get("university", ""))
+        dept = st.text_input("Program Studi *", value=u.get("department", ""))
+        saved = st.form_submit_button("Simpan", type="primary", use_container_width=True)
 
     if saved:
         if not (name.strip() and sid.strip() and age > 0 and uni.strip() and dept.strip()):
             st.error("Semua kolom bertanda * wajib diisi")
         else:
-            fields = dict(name=name.strip(), student_id=sid.strip(), age=int(age),
-                          gender=gender, university=uni.strip(), department=dept.strip())
-            if photo:
-                fields["photo"] = photo.getvalue()
-            db.update_profile(u["id"], **fields)
-            ss.user = db.get_user(u["id"])
+            ss.user = dict(
+                name=name.strip(), student_id=sid.strip(), age=int(age), gender=gender,
+                university=uni.strip(), department=dept.strip(),
+                photo=photo.getvalue() if photo else u.get("photo"),
+            )
             ss.page = "landing"
             st.rerun()
 
-    hist = db.get_history(u["id"])
-    if hist:
-        st.divider()
-        st.subheader("Riwayat Tes")
-        st.dataframe(
-            [{"Tanggal": h["created_at"], "PSS-10": h["pss"], "GAD-7": h["gad"], "PHQ-9": h["phq"],
-              "Domain Utama": h["primary_domain"], "Severity": h["primary_severity"]} for h in hist],
-            use_container_width=True, hide_index=True,
-        )
     st.button("← Kembali ke beranda", on_click=go, args=("landing",), type="tertiary")
 
 
@@ -255,7 +184,7 @@ def _report_text(r: dict, user: dict | None) -> str:
                f"Gender: {GENDERS.get(user['gender'], 'Lainnya')}\nUniversitas: {user['university']}\n"
                f"Program Studi: {user['department']}\n\n")
     else:
-        who = "Pengguna: Anonim (Belum login)\n\n"
+        who = "Pengguna: Anonim\n\n"
     line = "=" * 33
     return (
         f"Hasil Assessment Stress Level\n{line}\n{who}HASIL TES:\n{line}\n"
@@ -284,17 +213,12 @@ def page_results():
         st.rerun()
     r = sc.evaluate(answers)
 
-    if ss.user and not ss.result_saved:
-        db.save_result(ss.user["id"], r["pss"], r["gad"], r["phq"], r["primary_name"], r["primary_sev"])
-        ss.result_saved = True
-
     header()
     st.markdown("<h2 style='text-align:center'>Hasil Assessment Anda</h2>", unsafe_allow_html=True)
     if ss.user:
-        st.caption(f"{ss.user['name']} - {ss.user['student_id']}  |  hasil tersimpan di riwayat profil")
+        st.caption(f"{ss.user['name']} - {ss.user['student_id']}")
     else:
-        st.caption("Mode Anonim. Login dulu kalau mau hasil tersimpan.")
-        st.button("Login untuk menyimpan hasil", on_click=go, args=("auth",), type="tertiary")
+        st.caption("Mode anonim. Isi Data Diri di pojok kanan atas kalau mau namamu tercantum di file hasil.")
 
     color = SEV_COLOR[r["primary_sev"]]
     st.markdown(
@@ -346,7 +270,6 @@ def page_results():
 # ---------------------------------------------------------------- router
 {
     "landing": page_landing,
-    "auth": page_auth,
     "profile": page_profile,
     "questions": page_questions,
     "results": page_results,
